@@ -31,21 +31,36 @@ class RabbitMQClient:
         self.prefetch_count = _config.DEFAULT_PREFETCH_COUNT
 
         self._initialized = True
-        logger.info(f"RabbitMQClient initialized with URL: {self.rabbitmq_url}")
+        logger.debug(f"RabbitMQClient initialized with URL: {self.rabbitmq_url}")
 
     def connect(
         self,
-        rabbitmq_url=None,
-        exchange_name=None,
-        queue_name=None,
-        max_retries=None,
-        retry_delay=None,
-    ):
-        self.rabbitmq_url = rabbitmq_url or self.rabbitmq_url
-        self.exchange_name = exchange_name or self.exchange_name
-        self.queue_name = queue_name or self.queue_name
-        self.max_retries = max_retries or self.max_retries
-        self.retry_delay = retry_delay or self.retry_delay
+        rabbitmq_url: str = _config.RABBITMQ_URL,
+        exchange_name: str = _config.EXCHANGE_NAME,
+        queue_name: str = _config.QUEUE_NAME,
+        max_retries: int = _config.MAX_RETRIES,
+        retry_delay: int = _config.RETRY_DELAY,
+    ) -> bool:
+        """
+        Establish a connection to RabbitMQ and set up the channel.
+
+        Args:
+            rabbitmq_url (str, optional): RabbitMQ connection URL. Defaults to 'amqp://guest:guest@localhost:5672/%2F'.
+            exchange_name (str, optional): Exchange name to use.  Defaults to 'exchange_data'.
+            queue_name (str, optional):  Queue name to use. Defaults to 'exchange_data_queue'.
+            max_retries (int, optional): Maximum number of retries for connection attempts. Defaults to 5.
+            retry_delay (int, optional): Delay between retries in seconds. Defaults to 5.
+
+        Returns:
+            bool: True if connection and channel are established successfully, False otherwise.
+        """
+
+        logger.debug("Connecting to RabbitMQ...")
+        self.rabbitmq_url = rabbitmq_url
+        self.exchange_name = exchange_name
+        self.queue_name = queue_name
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
 
         self._close_resources()
 
@@ -54,7 +69,17 @@ class RabbitMQClient:
         )
         return self.connection is not None and self.channel is not None
 
-    def get_channel(self):
+    def get_channel(self) -> "pika.channel.Channel":
+        """
+        Get the RabbitMQ channel, reconnecting if necessary.
+
+        Raises:
+            ConnectionError: If the channel is closed or unavailable, and reconnection fails.
+
+        Returns:
+            Channel: The RabbitMQ channel object.
+        """
+
         if not self.channel or self.channel.is_closed:
             logger.warning("Channel closed or unavailable, reconnecting...")
             if not self.connect():
@@ -62,23 +87,39 @@ class RabbitMQClient:
 
         return self.channel
 
-    def consume(self, callback_function, queue_name=None, exchange_type="direct", routing_key=""):
+    def consume(
+        self,
+        callback_function: callable,
+        queue_name: str = "",
+        exchange_type: str = "direct",
+        routing_key: str = "",
+    ):
+        """
+        Consume messages from a RabbitMQ queue and process them with the provided callback function.
+
+        Args:
+            callback_function (callable):  The function to call when a message is received.
+            queue_name (str, optional): The name of the queue to consume from. Defaults to the instance's queue_name.
+            exchange_type (str, optional): The type of exchange to declare. Defaults to 'direct'.
+            routing_key (str, optional): The routing key to use for binding the queue to the exchange. Defaults to an empty string.
+        """
+
         queue_name = queue_name or self.queue_name
         try:
             channel = self.get_channel()
 
-            logger.info(f"Declaring exchange '{self.exchange_name}' of type '{exchange_type}'")
+            logger.debug(f"Declaring exchange '{self.exchange_name}' of type '{exchange_type}'")
             channel.exchange_declare(exchange=self.exchange_name, exchange_type=exchange_type)
 
-            logger.info(f"Declaring queue '{queue_name}' (durable=True)")
+            logger.debug(f"Declaring queue '{queue_name}' (durable=True)")
             result = channel.queue_declare(queue=queue_name)
 
-            logger.info(f"Binding queue '{result.method.queue}' to exchange '{self.exchange_name}'")
+            logger.debug(f"Binding queue '{result.method.queue}' to exchange '{self.exchange_name}'")
             channel.queue_bind(exchange=self.exchange_name, queue=queue_name, routing_key=routing_key)
 
             channel.basic_qos(prefetch_count=self.prefetch_count)
 
-            logger.info(f"Waiting for messages on queue '{queue_name}'.")
+            logger.debug(f"Waiting for messages on queue '{queue_name}'.")
             channel.basic_consume(
                 queue=queue_name,
                 on_message_callback=callback_function,
@@ -93,10 +134,18 @@ class RabbitMQClient:
             raise
 
     def _close_resources(self):
+        """
+        Close the RabbitMQ connection and channel resources.
+        """
+
         _connection.close_resources(self.connection, self.channel)
         self.connection = None
         self.channel = None
 
     def close(self):
-        logger.info("Closing RabbitMQ client resources.")
+        """
+        Close the RabbitMQ client resources gracefully.
+        """
+
+        logger.debug("Closing RabbitMQ client resources.")
         self._close_resources()
