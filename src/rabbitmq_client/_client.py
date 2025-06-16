@@ -46,8 +46,8 @@ class RabbitMQClient:
 
         Args:
             rabbitmq_url (str, optional): RabbitMQ connection URL. Defaults to 'amqp://guest:guest@localhost:5672/%2F'.
-            exchange_name (str, optional): Exchange name to use.  Defaults to 'exchange_data'.
-            queue_name (str, optional):  Queue name to use. Defaults to 'exchange_data_queue'.
+            exchange_name (str, optional): Exchange name to use.  Defaults to 'amq.topic'.
+            queue_name (str, optional):  Queue name to use. Defaults to 'my_queue'.
             max_retries (int, optional): Maximum number of retries for connection attempts. Defaults to 5.
             retry_delay (int, optional): Delay between retries in seconds. Defaults to 5.
 
