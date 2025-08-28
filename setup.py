@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="rabbitmq-client",
-    version="0.1.2",
+    version="0.2.0",
     description="Singleton RabbitMQ client with modular structure and retry logic.",
     author="Belkhiria Ash",
     author_email="belkhiria.achraf@gmail.com",
