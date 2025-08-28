@@ -86,6 +86,48 @@ class RabbitMQClient:
                 raise ConnectionError("Failed to connect and get a channel after retries.")
 
         return self.channel
+    
+    def send_message(
+        self,
+        message: str,
+        exchange_name: str = "",
+        routing_key: str = "",
+        exchange_type: str = "direct",
+    ):
+        """
+        Send a message to a RabbitMQ exchange.
+
+        Args:
+            message (str): The message content to send.
+            exchange_name (str, optional): The name of the exchange to send the message to. Defaults to the instance's exchange_name.
+            routing_key (str, optional): The routing key for the message. Defaults to an empty string.
+            exchange_type (str, optional): The type of exchange to declare. Defaults to 'direct'.
+        """
+        exchange_name = exchange_name or self.exchange_name
+        try:
+            channel = self.get_channel()
+
+            logger.debug(
+                f"Declaring exchange '{exchange_name}' of type '{exchange_type}'"
+            )
+            channel.exchange_declare(
+                exchange=exchange_name, exchange_type=exchange_type
+            )
+
+            logger.debug(
+                f"Publishing message to exchange '{exchange_name}' with routing key '{routing_key}'"
+            )
+            channel.basic_publish(
+                exchange=exchange_name, routing_key=routing_key, body=message
+            )
+            logger.debug(
+                f"Message published to exchange '{exchange_name}' with routing key '{routing_key}'"
+            )
+
+        except Exception as e:
+            logger.error(f"Error sending message: {e}")
+            self._close_resources()
+            raise
 
     def consume(
         self,
